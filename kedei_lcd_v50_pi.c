@@ -27,10 +27,10 @@
 #define LCD_HEIGHT 320
 
 uint8_t lcd_rotations[4] = {
-	0b11101010, // 0
-	0b01001010, // 90
-	0b00101010, //180
-	0b10001010	//270
+	0b11101010,	//   0
+	0b01001010,	//  90
+	0b00101010,	// 180
+	0b10001010	// 270
 };
 
 volatile uint8_t color;
@@ -140,18 +140,22 @@ void lcd_data(uint8_t dat) {
 void lcd_color(uint16_t col) {
 	uint8_t b1[3];
 
-	// 0xF800 R
-	// 0x07E0 G
-	// 0x001F B
+	// 18bit color mode ???
+	// 0xF800 R(R5-R1, DB17-DB13)
+	// 0x07E0 G(G5-G0, DB11- DB6)
+	// 0x001F B(B5-B1, DB5 - DB1)
+	// 0x40 = R(R0, DB12), 0x20 = B(B0, DB0)
+	// copy Red/Blue color bit1 to bit0
+	uint8_t pseud = ((col>>5) & 0x40) | ((col<<5) & 0x20);
 
 	b1[0]= col>>8;
 	b1[1]= col&0x00FF;
-	b1[2]= 0x75;
+	b1[2]= pseud | 0x15;
 	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 
 	b1[0]= col>>8;
 	b1[1]= col&0x00FF;
-	b1[2]= 0x7F;
+	b1[2]= pseud | 0x1F;
 	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
 
@@ -162,6 +166,31 @@ uint16_t colorRGB(uint8_t r, uint8_t g, uint8_t b) {
 //	printf("%02x %02x %02x %04x\n", r, g, b, col);
 
 	return col;
+}
+
+
+// 18bit color mode
+void lcd_colorRGB(uint8_t r, uint8_t g, uint8_t b) {
+	uint8_t b1[3];
+
+	uint16_t col = ((r<<8) & 0xF800) | ((g<<3) & 0x07E0) | ((b>>3) & 0x001F);
+
+	// 18bit color mode ???
+	// 0xF800 R(R5-R1, DB17-DB13)
+	// 0x07E0 G(G5-G0, DB11- DB6)
+	// 0x001F B(B5-B1, DB5 - DB1)
+	// 0x40 = R(R0, DB12), 0x20 = B(B0, DB0)
+	uint8_t pseud = ((r<<6) & 0x40) | ((b<<5) & 0x20);
+
+	b1[0]= col>>8;
+	b1[1]= col&0x00FF;
+	b1[2]= pseud | 0x15;
+	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
+
+	b1[0]= col>>8;
+	b1[1]= col&0x00FF;
+	b1[2]= pseud | 0x1F;
+	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
 
 
@@ -232,6 +261,18 @@ void lcd_fill(uint16_t col) {
 }
 
 
+void lcd_fillframeRGB(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, uint8_t g, uint8_t b) {
+	int span=h*w;
+	lcd_setframe(x,y,w,h);
+	int q;
+	for(q=0;q<span;q++) { lcd_colorRGB(r, g, b); }
+}
+
+void lcd_fillRGB(uint8_t r, uint8_t g, uint8_t b) {
+	lcd_fillframeRGB(0, 0, LCD_WIDTH, LCD_HEIGHT, r, g, b);
+}
+
+
 void lcd_img(char *fname, uint16_t x, uint16_t y) {
 
 	uint8_t buf[54];
@@ -262,10 +303,11 @@ void lcd_img(char *fname, uint16_t x, uint16_t y) {
 				// c = relative column address (x)
 				fread(buf, 3, 1, f);
 
-				// 0x001F B buf[0]
-				// 0x07E0 G buf[1]
-				// 0xF800 R buf[2]
-				lcd_color(colorRGB(buf[2], buf[1], buf[0]));
+				// B buf[0]
+				// G buf[1]
+				// R buf[2]
+				// 18bit color mode
+				lcd_colorRGB(buf[2], buf[1], buf[0]);
 			}
 		}
 
@@ -311,14 +353,14 @@ int main(int argc,char *argv[]) {
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
 	delay(500);
 
-	lcd_fill(colorRGB(0xFF, 0x00, 0x00));
-	lcd_fill(colorRGB(0x00, 0xFF, 0x00));
-	lcd_fill(colorRGB(0xFF, 0xFF, 0x00));
-	lcd_fill(colorRGB(0x00, 0x00, 0xFF));
-	lcd_fill(colorRGB(0xFF, 0x00, 0xFF));
-	lcd_fill(colorRGB(0x00, 0xFF, 0xFF));
-	lcd_fill(colorRGB(0xFF, 0xFF, 0xFF));
-	lcd_fill(colorRGB(0x00, 0x00, 0x00));
+	lcd_fillRGB(0xFF, 0x00, 0x00);
+	lcd_fillRGB(0x00, 0xFF, 0x00);
+	lcd_fillRGB(0xFF, 0xFF, 0x00);
+	lcd_fillRGB(0x00, 0x00, 0xFF);
+	lcd_fillRGB(0xFF, 0x00, 0xFF);
+	lcd_fillRGB(0x00, 0xFF, 0xFF);
+	lcd_fillRGB(0xFF, 0xFF, 0xFF);
+	lcd_fillRGB(0x00, 0x00, 0x00);
 
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
