@@ -209,6 +209,39 @@ void lcd_init(void) {
 	//reset display
 	lcd_rst();
 
+	/*
+	KeDei 3.5 inch 480x320 TFT lcd from ali
+	https://www.raspberrypi.org/forums/viewtopic.php?t=124961&start=162
+	by Conjur > Thu Aug 04, 2016 11:57 am
+	Initialize Parameter
+	<Pulse reset>
+	00
+	11
+	EE 02 01 02 01
+	ED 00 00 9A 9A 9B 9B 00 00 00 00 AE AE 01 A2 00
+	B4 00
+	C0 10 3B 00 02 11
+	C1 10
+	C8 00 46 12 20 0C 00 56 12 67 02 00 0C
+	D0 44 42 06
+	D1 43 16
+	D2 04 22
+	D3 04 12
+	D4 07 12
+	E9 00
+	C5 08
+	36 2A
+	3A 66
+	2A 00 00 01 3F
+	2B 00 00 01 E0
+	35 00
+	29
+	00
+	11
+	EE 02 01 02 01
+	ED 00 00 9A 9A 9B 9B 00 00 00 00 AE AF 01 A2 01 BF 2A
+	*/
+
 	lcd_cmd(0x00);
 	lcd_cmd(0x11);delayms(200); //Sleep Out
 
@@ -230,11 +263,20 @@ void lcd_init(void) {
 	lcd_cmd(0xE9); lcd_data(0x00);
 	lcd_cmd(0xC5); lcd_data(0x08);
 
+	// 36 2A
 	lcd_setrotation(0);
+	lcd_cmd(0x3A); lcd_data(0x66);	// RGB666 18bit color
+	//	2A 00 00 01 3F
+	//	2B 00 00 01 E0
+	lcd_cmd(0x35); lcd_data(0x00);
 
 	lcd_cmd(0x29);delayms(200); // Display On
 	lcd_cmd(0x00);	// NOP
 	lcd_cmd(0x11);delayms(200); // Sleep Out
+
+	//
+	lcd_cmd(0xEE); lcd_data(0x02); lcd_data(0x01); lcd_data(0x02); lcd_data(0x01);
+	lcd_cmd(0xED); lcd_data(0x00); lcd_data(0x00); lcd_data(0x9A); lcd_data(0x9A); lcd_data(0x9B); lcd_data(0x9B); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0xAE); lcd_data(0xAF); lcd_data(0x01); lcd_data(0xA2); lcd_data(0x01); lcd_data(0xBF); lcd_data(0x2A);
 }
 
 void lcd_setframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
