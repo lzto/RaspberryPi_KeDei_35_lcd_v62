@@ -86,6 +86,26 @@ sudo ./kedei_lcd_v50_pi_spidev
 
 
 ---
+## Build WiringPi library version
+##### # WiringPi - GPIO Interface library for the Raspberry Pi
+##### # http://wiringpi.com/
+
+#### # Enable SPI
+sudo raspi-config
+
+#### # git clone
+cd  
+git clone https://github.com/FREEWING-JP/RaspberryPi_KeDei_35_lcd_v50.git
+
+#### # compile
+cd ~/RaspberryPi_KeDei_35_lcd_v50  
+gcc -o kedei_lcd_v50_pi_wiringpi kedei_lcd_v50_pi_wiringpi.c  
+
+#### # execute !
+sudo ./kedei_lcd_v50_pi_wiringpi
+
+
+---
 ## Picture
 
 ![Raspberry Pi KeDei 3.5 inch LCD V5.0 module Control program](/kedei_35_lcd_v50_module_spi_progrmable.jpg)
