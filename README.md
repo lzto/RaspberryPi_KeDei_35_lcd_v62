@@ -1,11 +1,14 @@
 # RaspberryPi_KeDei_35_lcd_v50
 Raspberry Pi KeDei 3.5 inch TFT LCD module V5.0 Control program
 
-
+---
 ## Raspberry Pi用 KeDei 3.5インチ TFT液晶を自前のプログラムで制御する方法
 http://www.neko.ne.jp/~freewing/raspberry_pi/raspberry_pi_3_tft_lcd_3_5inch_kedei_touch_xpt2046_2/
 
+## FREE WING Homepage
+http://www.neko.ne.jp/~freewing/
 
+---
 ## References（参考文献）
 ### KeDei 3.5 inch 480x320 TFT lcd from ali
 https://www.raspberrypi.org/forums/viewtopic.php?p=1019562  
@@ -14,8 +17,10 @@ https://www.raspberrypi.org/forums/viewtopic.php?p=1019562
 ### l0nley/kedei35
 https://github.com/l0nley/kedei35
 
-
-## Build
+---
+## Build bcm2835 version
+##### # C library for Broadcom BCM 2835 as used in Raspberry Pi
+##### # http://www.airspayce.com/mikem/bcm2835/
 
 #### # Enable SPI
 sudo raspi-config
@@ -40,9 +45,50 @@ gcc -o kedei_lcd_v50_pi kedei_lcd_v50_pi.c -lbcm2835
 sudo ./kedei_lcd_v50_pi
 
 
+---
+## Build The pigpio library version
+##### # The pigpio library
+##### # http://abyz.co.uk/rpi/pigpio/
+
+#### # Enable SPI
+sudo raspi-config
+
+#### # git clone
+cd  
+git clone https://github.com/FREEWING-JP/RaspberryPi_KeDei_35_lcd_v50.git
+
+#### # compile
+cd ~/RaspberryPi_KeDei_35_lcd_v50  
+gcc -o kedei_lcd_v50_pi_pigpio kedei_lcd_v50_pi_pigpio.c -lpigpio -lrt -lpthread  
+
+#### # execute !
+sudo ./kedei_lcd_v50_pi_pigpio
+
+
+---
+## Build Linux spidev version
+##### # SPIdev - The Linux Kernel Archives
+##### # https://www.kernel.org/doc/Documentation/spi/spidev
+
+#### # Enable SPI
+sudo raspi-config
+
+#### # git clone
+cd  
+git clone https://github.com/FREEWING-JP/RaspberryPi_KeDei_35_lcd_v50.git
+
+#### # compile
+cd ~/RaspberryPi_KeDei_35_lcd_v50  
+gcc -o kedei_lcd_v50_pi_spidev kedei_lcd_v50_pi_spidev.c  
+
+#### # execute !
+sudo ./kedei_lcd_v50_pi_spidev
+
+
+---
 ## Picture
 
-![Raspberry Pi KeDei 3.5 inch LCD module V5.0 Control program](/kedei_35_lcd_v50_module_spi_progrmable.jpg)
+![Raspberry Pi KeDei 3.5 inch LCD V5.0 module Control program](/kedei_35_lcd_v50_module_spi_progrmable.jpg)
 
-![Raspberry Pi KeDei 3.5 inch LCD module V5.0 module](/kedei_35_lcd_v50_module.jpg)
+![Raspberry Pi KeDei 3.5 inch LCD V5.0 module](/kedei_35_lcd_v50_module.jpg)
 

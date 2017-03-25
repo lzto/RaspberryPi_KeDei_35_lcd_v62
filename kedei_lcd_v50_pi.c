@@ -10,6 +10,7 @@
  //
  // gcc -o kedei_lcd_v50_pi kedei_lcd_v50_pi.c -lbcm2835
  // sudo ./kedei_lcd_v50_pi
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,7 +89,7 @@ int lcd_close(void) {
 	return 0;
 }
 
-int spi_transmit(int devsel, uint8_t *data, int len) {
+void spi_transmit(int devsel, uint8_t *data, int len) {
 	if(devsel == 0)
 	{
 		bcm2835_spi_chipSelect(BCM2835_SPI_CS0);
@@ -299,7 +300,7 @@ void lcd_fillframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t col)
 }
 
 void lcd_fill(uint16_t col) {
-	lcd_fillframe(0, 0, LCD_WIDTH, LCD_HEIGHT, col);
+	lcd_fillframe(0, 0, lcd_w, lcd_h, col);
 }
 
 
@@ -311,7 +312,7 @@ void lcd_fillframeRGB(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
 }
 
 void lcd_fillRGB(uint8_t r, uint8_t g, uint8_t b) {
-	lcd_fillframeRGB(0, 0, LCD_WIDTH, LCD_HEIGHT, r, g, b);
+	lcd_fillframeRGB(0, 0, lcd_w, lcd_h, r, g, b);
 }
 
 
@@ -380,7 +381,7 @@ void loop() {
 	//if rotation is overflowed, reset to 0
 	if (lcd_rotation==4) lcd_rotation=0;
 
-	delay(500);
+	delayms(500);
 }
 
 
@@ -393,7 +394,7 @@ int main(int argc,char *argv[]) {
 	lcd_fill(0); //black out the screen.
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
-	delay(500);
+	delayms(500);
 
 	lcd_fillRGB(0xFF, 0x00, 0x00);
 	lcd_fillRGB(0x00, 0xFF, 0x00);
@@ -406,7 +407,7 @@ int main(int argc,char *argv[]) {
 
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
-	delay(500);
+	delayms(500);
 
 	// Demo
 	color=0;
@@ -422,3 +423,4 @@ int main(int argc,char *argv[]) {
 
 	lcd_close();
 }
+

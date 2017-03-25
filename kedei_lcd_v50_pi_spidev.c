@@ -8,9 +8,9 @@
  // Modified by FREE WING, Y.Sakamoto
  // http://www.neko.ne.jp/~freewing/
  //
- // The pigpio library version
- // gcc -o kedei_lcd_v50_pi_pigpio kedei_lcd_v50_pi_pigpio.c -lpigpio -lrt -lpthread
- // sudo ./kedei_lcd_v50_pi_pigpio
+ // Linux spidev version
+ // gcc -o kedei_lcd_v50_pi_spidev kedei_lcd_v50_pi_spidev.c
+ // sudo ./kedei_lcd_v50_pi_spidev
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,9 +19,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <time.h>
-#include <pigpio.h>
+#include <linux/spi/spidev.h>
 
+#define LCD_DEVICE "/dev/spidev0.1"
 #define LCD_CS 1
 #define TOUCH_CS 0
 #define LCD_WIDTH  480
@@ -30,6 +30,10 @@
 #define uint8_t unsigned char
 #define uint16_t unsigned int
 #define uint32_t unsigned long
+
+static const uint32_t mode = 0;
+static const uint8_t bits = 8;
+static const uint32_t speed = 32000000;
 
 uint8_t lcd_rotations[4] = {
 	0b11101010,	//   0
@@ -65,33 +69,52 @@ uint16_t colors[16] = {
 
 
 void delayms(int ms) {
-	time_sleep(ms/1000.0);
+
+	struct timespec req;
+	req.tv_sec  = 0;
+	req.tv_nsec = ms * 1000000L;
+
+	nanosleep(&req, NULL);
 }
 
 
 int lcd_open(void) {
-	int r;
-	uint32_t v;
-	r = gpioInitialise();
-	if(r<0) return -1;
+	int ret;
 
-	// 21MHz NG 20.8334MHz
-	// 20MHz OK 20.8332MHz
-	// 16MHz, MSB first, 3wire
-	spih = spiOpen(LCD_CS, 19200000, 0);
+	spih = open(LCD_DEVICE, O_WRONLY);
 	if(spih<0) return -1;
+
+	ret = ioctl(spih, SPI_IOC_WR_MODE32, &mode);
+	if (ret<0) return -1;
+
+	ret = ioctl(spih, SPI_IOC_WR_BITS_PER_WORD, &bits);
+	if (ret<0) return -1;
+
+	ret = ioctl(spih, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+	if (ret<0) return -1;
+
 	return 0;
 }
 
 int lcd_close(void) {
-	spiClose(spih);
-	gpioTerminate();
+	close(spih);
+
 
 	return 0;
 }
 
 int spi_transmit(int devsel, uint8_t *data, int len) {
-	return spiWrite(spih, (char*)data, len);
+
+	struct spi_ioc_transfer tr = {
+			.tx_buf = (unsigned long)data,
+			.rx_buf = (unsigned long)NULL,
+			.len = len,
+			.delay_usecs = 0,
+			.speed_hz = speed,
+			.bits_per_word = bits
+		};
+
+	return ioctl(spih, SPI_IOC_MESSAGE(1), &tr);
 }
 
 void lcd_rst(void) {
