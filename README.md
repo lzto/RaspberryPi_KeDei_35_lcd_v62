@@ -1,9 +1,15 @@
 # RaspberryPi_KeDei_35_lcd_v50
-Raspberry Pi KeDei 3.5 inch TFT LCD module V5.0 Control program
+Raspberry Pi KeDei 3.5 inch TFT LCD module V5.0 SPI Control program
 
 ---
 ## Raspberry Pi用 KeDei 3.5インチ TFT液晶を自前のプログラムで制御する方法
 http://www.neko.ne.jp/~freewing/raspberry_pi/raspberry_pi_3_tft_lcd_3_5inch_kedei_touch_xpt2046_2/
+
+You can choose any control method .  
+1. bcm2835 version  
+2. The pigpio library version  
+3. Linux spidev version  
+4. WiringPi library version  
 
 ## FREE WING Homepage
 http://www.neko.ne.jp/~freewing/
