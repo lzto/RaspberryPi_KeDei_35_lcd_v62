@@ -2,6 +2,12 @@
 Raspberry Pi KeDei 3.5 inch TFT LCD module V5.0 SPI Control program
 
 ---
+## KeDei version V5.0 only 
+
+ This program works only with KeDei 3.5 inch TFT LCD module V 5.0.  
+ Other versions will not work .  
+
+---
 ## Raspberry Pi用 KeDei 3.5インチ TFT液晶を自前のプログラムで制御する方法
 http://www.neko.ne.jp/~freewing/raspberry_pi/raspberry_pi_3_tft_lcd_3_5inch_kedei_touch_xpt2046_2/
 
