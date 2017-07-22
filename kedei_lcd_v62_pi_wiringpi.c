@@ -8,9 +8,9 @@
  // Modified by FREE WING, Y.Sakamoto
  // http://www.neko.ne.jp/~freewing/
  //
- // The pigpio library version
- // gcc -o kedei_lcd_v50_pi_pigpio kedei_lcd_v50_pi_pigpio.c -lpigpio -lrt -lpthread
- // sudo ./kedei_lcd_v50_pi_pigpio
+ // WiringPi library version
+ // gcc -o kedei_lcd_v50_pi_wiringpi kedei_lcd_v50_pi_wiringpi.c -lwiringPi
+ // sudo ./kedei_lcd_v50_pi_wiringpi
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,10 +20,12 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <time.h>
-#include <pigpio.h>
+#include <wiringPiSPI.h>
+#include <wiringPi.h>
 
 #define LCD_CS 1
 #define TOUCH_CS 0
+
 #define LCD_WIDTH  480
 #define LCD_HEIGHT 320
 
@@ -42,7 +44,6 @@ volatile uint8_t color;
 volatile uint8_t lcd_rotation;
 volatile uint16_t lcd_h;
 volatile uint16_t lcd_w;
-volatile int spih;
 
 uint16_t colors[16] = {
 	0b0000000000000000,				/* BLACK	000000 */
@@ -65,105 +66,97 @@ uint16_t colors[16] = {
 
 
 void delayms(int ms) {
-	time_sleep(ms/1000.0);
+	delay(ms);
 }
 
 
 int lcd_open(void) {
 	int r;
-	uint32_t v;
-	r = gpioInitialise();
-	if(r<0) return -1;
+    r = wiringPiSetup();
+    if (r<0)
+        return -1;
 
-	// 21MHz NG 20.8334MHz
-	// 20MHz OK 20.8332MHz
-	// 16MHz, MSB first, 3wire
-	spih = spiOpen(LCD_CS, 19200000, 0);
-	if(spih<0) return -1;
+	r = wiringPiSPISetup(LCD_CS, 32000000);
+	if(r<0)
+        return -1;
+#if 0
+	r = wiringPiSPISetup(TOUCH_CS, 1000000);
+	if(r<0)
+        return -1;
+#endif
+    wiringPiSetup();
+    pinMode(10, OUTPUT);
+    digitalWrite(10, HIGH);
 	return 0;
 }
 
 int lcd_close(void) {
-	spiClose(spih);
-	gpioTerminate();
 
 	return 0;
 }
 
-int spi_transmit(int devsel, uint8_t *data, int len) {
-	return spiWrite(spih, (char*)data, len);
+int spi_transmit(int devsel, uint8_t *data, int len)
+{
+    int ret = 0;
+    digitalWrite(10, HIGH);
+	ret = wiringPiSPIDataRW(devsel, (unsigned char*)data, len);
+    digitalWrite(10, LOW);
+    return ret;
 }
 
-void lcd_rst(void) {
-	uint8_t buff[1];
+void lcd_rst(void)
+{
+	uint8_t buff[4];
+	buff[0] = 0x00;
+	buff[1] = 0x01;
+	buff[2] = 0x00;
+    buff[3] = 0x00;
+	spi_transmit(LCD_CS, &buff[0], sizeof(buff));
+	delayms(50);
 
 	buff[0] = 0x00;
+	buff[1] = 0x00;
+	buff[2] = 0x00;
+	buff[3] = 0x00;
 	spi_transmit(LCD_CS, &buff[0], sizeof(buff));
-	delayms(150);
-
-	buff[0] = 0x01;
+	delayms(100);
+    
+	buff[0] = 0x00;
+	buff[1] = 0x01;
+	buff[2] = 0x00;
+	buff[3] = 0x00;
 	spi_transmit(LCD_CS, &buff[0], sizeof(buff));
-	delayms(250);
+	delayms(50);
 }
 
 
-void lcd_cmd(uint8_t cmd) {
-	uint8_t b1[2];
-
-	b1[0] = cmd>>1;
-	b1[1] = ((cmd&1)<<5) | 0x11;
-	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
-
-	b1[0] = cmd>>1;
-	b1[1] = ((cmd&1)<<5) | 0x1B;
-	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
-}
-
-
-void lcd_data(uint8_t dat) {
-	uint8_t b1[2];
-
-	b1[0] = dat>>1;
-	b1[1] = ((dat&1)<<5) | 0x15;
-	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
-
-	b1[0] = dat>>1;
-	b1[1] = ((dat&1)<<5) | 0x1F;
+void lcd_cmd(uint8_t cmd)
+{
+    uint8_t b1[3];
+    b1[0] = 0x11;
+	b1[1] = 0x00;
+	b1[2] = cmd;
 	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
 
 
-void lcd_color(uint16_t col) {
-	uint8_t b1[3];
-
-	// 18bit color mode ???
-	// 0xF800 R(R5-R1, DB17-DB13)
-	// 0x07E0 G(G5-G0, DB11- DB6)
-	// 0x001F B(B5-B1, DB5 - DB1)
-	// 0x40 = R(R0, DB12), 0x20 = B(B0, DB0)
-	// copy Red/Blue color bit1 to bit0
-	uint8_t pseud = ((col>>5) & 0x40) | ((col<<5) & 0x20);
-
-	b1[0]= col>>8;
-	b1[1]= col&0x00FF;
-	b1[2]= pseud | 0x15;
-	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
-
-	b1[0]= col>>8;
-	b1[1]= col&0x00FF;
-	b1[2]= pseud | 0x1F;
+void lcd_data(uint8_t dat)
+{
+    uint8_t b1[3];
+    b1[0] = 0x15;
+    b1[1] = 0x00;
+    b1[2] = dat;
 	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
 
-
-uint16_t colorRGB(uint8_t r, uint8_t g, uint8_t b) {
-
-	uint16_t col = ((r<<8) & 0xF800) | ((g<<3) & 0x07E0) | ((b>>3) & 0x001F);
-//	printf("%02x %02x %02x %04x\n", r, g, b, col);
-
-	return col;
+void lcd_color(uint16_t col)
+{
+    uint8_t b1[3];
+    b1[0] = 0x15;
+    b1[1] = col>>8;
+    b1[2] = col&0xFF;
+    spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
-
 
 // 18bit color mode
 void lcd_colorRGB(uint8_t r, uint8_t g, uint8_t b) {
@@ -176,22 +169,17 @@ void lcd_colorRGB(uint8_t r, uint8_t g, uint8_t b) {
 	// 0x07E0 G(G5-G0, DB11- DB6)
 	// 0x001F B(B5-B1, DB5 - DB1)
 	// 0x40 = R(R0, DB12), 0x20 = B(B0, DB0)
-	uint8_t pseud = ((r<<6) & 0x40) | ((b<<5) & 0x20);
-
-	b1[0]= col>>8;
-	b1[1]= col&0x00FF;
-	b1[2]= pseud | 0x15;
-	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
-
-	b1[0]= col>>8;
-	b1[1]= col&0x00FF;
-	b1[2]= pseud | 0x1F;
+    b1[0] = 0x15;
+	b1[1] = col>>8;
+	b1[2] = col&0x00FF;
 	spi_transmit(LCD_CS, &b1[0], sizeof(b1));
 }
 
 
-void lcd_setrotation(uint8_t m) {
-	lcd_cmd(0x36); lcd_data(lcd_rotations[m]);
+void lcd_setrotation(uint8_t m)
+{
+	lcd_cmd(0x36);
+    lcd_data(lcd_rotations[m]);
 	if (m&1) {
 		lcd_h = LCD_WIDTH;
 		lcd_w = LCD_HEIGHT;
@@ -201,115 +189,104 @@ void lcd_setrotation(uint8_t m) {
 	}
 }
 
-void lcd_init(void) {
-	//reset display
+void lcd_init(void)
+{
+//reset display
 	lcd_rst();
+//kedei 6.2
+    lcd_cmd(0x00);
+    delayms(10);
+    lcd_cmd(0xFF); lcd_cmd(0xFF);
+    delayms(10);
+    lcd_cmd(0xFF); lcd_cmd(0xFF); lcd_cmd(0xFF); lcd_cmd(0xFF);
+    delayms(15);
+    lcd_cmd(0x11);
+    delayms(150);
 
-	/*
-	KeDei 3.5 inch 480x320 TFT lcd from ali
-	https://www.raspberrypi.org/forums/viewtopic.php?t=124961&start=162
-	by Conjur > Thu Aug 04, 2016 11:57 am
-	Initialize Parameter
-	<Pulse reset>
-	00
-	11
-	EE 02 01 02 01
-	ED 00 00 9A 9A 9B 9B 00 00 00 00 AE AE 01 A2 00
-	B4 00
-	C0 10 3B 00 02 11
-	C1 10
-	C8 00 46 12 20 0C 00 56 12 67 02 00 0C
-	D0 44 42 06
-	D1 43 16
-	D2 04 22
-	D3 04 12
-	D4 07 12
-	E9 00
-	C5 08
-	36 2A
-	3A 66
-	2A 00 00 01 3F
-	2B 00 00 01 E0
-	35 00
-	29
-	00
-	11
-	EE 02 01 02 01
-	ED 00 00 9A 9A 9B 9B 00 00 00 00 AE AF 01 A2 01 BF 2A
-	*/
+    lcd_cmd(0xB0); lcd_data(0x00);
+    lcd_cmd(0xB3); lcd_data(0x02); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00);
+    lcd_cmd(0xB9); lcd_data(0x01); lcd_data(0x00); lcd_data(0x0F); lcd_data(0x0F);
+    lcd_cmd(0xC0); lcd_data(0x13); lcd_data(0x3B); lcd_data(0x00); lcd_data(0x02);
+                   lcd_data(0x00); lcd_data(0x01); lcd_data(0x00); lcd_data(0x43);
+    lcd_cmd(0xC1); lcd_data(0x08); lcd_data(0x0F); lcd_data(0x08); lcd_data(0x08);
+    lcd_cmd(0xC4); lcd_data(0x11); lcd_data(0x07); lcd_data(0x03); lcd_data(0x04);
+    lcd_cmd(0xC6); lcd_data(0x00);
+    lcd_cmd(0xC8); lcd_data(0x03); lcd_data(0x03); lcd_data(0x13); lcd_data(0x5C);
+                   lcd_data(0x03); lcd_data(0x07); lcd_data(0x14); lcd_data(0x08);
+                   lcd_data(0x00); lcd_data(0x21); lcd_data(0x08); lcd_data(0x14);
+                   lcd_data(0x07); lcd_data(0x53); lcd_data(0x0C); lcd_data(0x13);
+                   lcd_data(0x03); lcd_data(0x03); lcd_data(0x21); lcd_data(0x00);
+    lcd_cmd(0x35); lcd_data(0x00);
+    lcd_cmd(0x36); lcd_data(0x60);
+    lcd_cmd(0x3A); lcd_data(0x55);
+    lcd_cmd(0x44); lcd_data(0x00); lcd_data(0x01);
+    lcd_cmd(0xD0); lcd_data(0x07); lcd_data(0x07); lcd_data(0x1D); lcd_data(0x03);
+    lcd_cmd(0xD1); lcd_data(0x03); lcd_data(0x30); lcd_data(0x10);
+    lcd_cmd(0xD2); lcd_data(0x03); lcd_data(0x14); lcd_data(0x04);
+    lcd_cmd(0x29);
 
-	lcd_cmd(0x00);
-	lcd_cmd(0x11);delayms(200); //Sleep Out
+    delayms(30);
 
-	lcd_cmd(0xEE); lcd_data(0x02); lcd_data(0x01); lcd_data(0x02); lcd_data(0x01);
-	lcd_cmd(0xED); lcd_data(0x00); lcd_data(0x00); lcd_data(0x9A); lcd_data(0x9A); lcd_data(0x9B); lcd_data(0x9B); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0xAE); lcd_data(0xAE); lcd_data(0x01); lcd_data(0xA2); lcd_data(0x00);
-	lcd_cmd(0xB4); lcd_data(0x00);
+    lcd_cmd(0x2A); lcd_data(0x00); lcd_data(0x00); lcd_data(0x01); lcd_data(0x3F);
+    lcd_cmd(0x2B); lcd_data(0x00); lcd_data(0x00); lcd_data(0x01); lcd_data(0xE0);
+    lcd_cmd(0xB4); lcd_data(0x00);
 
-	// LCD_WIDTH
-	lcd_cmd(0xC0); lcd_data(0x10); lcd_data(0x3B); lcd_data(0x00); lcd_data(0x02); lcd_data(0x11);
-	lcd_cmd(0xC1); lcd_data(0x10);
-	lcd_cmd(0xC8); lcd_data(0x00); lcd_data(0x46); lcd_data(0x12); lcd_data(0x20); lcd_data(0x0C); lcd_data(0x00); lcd_data(0x56); lcd_data(0x12); lcd_data(0x67); lcd_data(0x02); lcd_data(0x00); lcd_data(0x0C);
+    lcd_cmd(0x2C);
 
-	lcd_cmd(0xD0); lcd_data(0x44); lcd_data(0x42); lcd_data(0x06);
-	lcd_cmd(0xD1); lcd_data(0x43); lcd_data(0x16);
-	lcd_cmd(0xD2); lcd_data(0x04); lcd_data(0x22);
-	lcd_cmd(0xD3); lcd_data(0x04); lcd_data(0x12);
-	lcd_cmd(0xD4); lcd_data(0x07); lcd_data(0x12);
-
-	lcd_cmd(0xE9); lcd_data(0x00);
-	lcd_cmd(0xC5); lcd_data(0x08);
-
-	// 36 2A
-	lcd_setrotation(0);
-	lcd_cmd(0x3A); lcd_data(0x66);	// RGB666 18bit color
-	//	2A 00 00 01 3F
-	//	2B 00 00 01 E0
-	lcd_cmd(0x35); lcd_data(0x00);
-
-	lcd_cmd(0x29);delayms(200); // Display On
-	lcd_cmd(0x00);	// NOP
-	lcd_cmd(0x11);delayms(200); // Sleep Out
-
-	//
-	lcd_cmd(0xEE); lcd_data(0x02); lcd_data(0x01); lcd_data(0x02); lcd_data(0x01);
-	lcd_cmd(0xED); lcd_data(0x00); lcd_data(0x00); lcd_data(0x9A); lcd_data(0x9A); lcd_data(0x9B); lcd_data(0x9B); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0x00); lcd_data(0xAE); lcd_data(0xAF); lcd_data(0x01); lcd_data(0xA2); lcd_data(0x01); lcd_data(0xBF); lcd_data(0x2A);
+    delayms(10);
+    lcd_setrotation(0);
 }
 
-void lcd_setframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+void lcd_setframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+{
 	lcd_cmd(0x2A);
-	lcd_data(x>>8); lcd_data(x&0xFF);
-	lcd_data(((w+x)-1)>>8); lcd_data(((w+x)-1)&0xFF);
+	    lcd_data(x>>8);
+        lcd_data(x&0xFF);
+	    lcd_data(((w+x)-1)>>8);
+        lcd_data(((w+x)-1)&0xFF);
 	lcd_cmd(0x2B);
-	lcd_data(y>>8); lcd_data(y&0xFF);
-	lcd_data(((h+y)-1)>>8); lcd_data(((h+y)-1)&0xFF);
+	    lcd_data(y>>8);
+        lcd_data(y&0xFF);
+	    lcd_data(((h+y)-1)>>8);
+        lcd_data(((h+y)-1)&0xFF);
 	lcd_cmd(0x2C);
 }
 
 //lcd_fillframe
 //fills an area of the screen with a single color.
-void lcd_fillframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t col) {
+void lcd_fillframe(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t col)
+{
+	int span=h*w;
+	int q;
+	lcd_setframe(x,y,w,h);
+	for(q=0;q<span;q++)
+    {
+        lcd_color(col);
+    }
+}
+
+void lcd_fill(uint16_t col)
+{
+    lcd_fillframe(0, 0, lcd_w, lcd_h, col);
+}
+
+void lcd_fillframeRGB(uint16_t x, uint16_t y,
+        uint16_t w, uint16_t h,
+        uint8_t r, uint8_t g, uint8_t b)
+{
 	int span=h*w;
 	lcd_setframe(x,y,w,h);
 	int q;
-	for(q=0;q<span;q++) { lcd_color(col); }
+	for(q=0;q<span;q++)
+    {
+        lcd_colorRGB(r, g, b);
+    }
 }
 
-void lcd_fill(uint16_t col) {
-	lcd_fillframe(0, 0, lcd_w, lcd_h, col);
-}
-
-
-void lcd_fillframeRGB(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, uint8_t g, uint8_t b) {
-	int span=h*w;
-	lcd_setframe(x,y,w,h);
-	int q;
-	for(q=0;q<span;q++) { lcd_colorRGB(r, g, b); }
-}
-
-void lcd_fillRGB(uint8_t r, uint8_t g, uint8_t b) {
+void lcd_fillRGB(uint8_t r, uint8_t g, uint8_t b)
+{
 	lcd_fillframeRGB(0, 0, lcd_w, lcd_h, r, g, b);
 }
-
 
 void lcd_img(char *fname, uint16_t x, uint16_t y) {
 
@@ -379,19 +356,20 @@ void loop() {
 	delayms(500);
 }
 
+int main(int argc,char *argv[])
+{
+	if(lcd_open())
+    {
+        printf("error!\n");
+        exit(-1);
+    }
 
-int main(int argc,char *argv[]) {
+    lcd_init();
 
-	lcd_open();
-
-	lcd_init();
-
-	lcd_fill(0); //black out the screen.
-
+    lcd_fill(0x0); //black out the screen.
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
 	delayms(500);
-
 	lcd_fillRGB(0xFF, 0x00, 0x00);
 	lcd_fillRGB(0x00, 0xFF, 0x00);
 	lcd_fillRGB(0xFF, 0xFF, 0x00);
@@ -400,11 +378,9 @@ int main(int argc,char *argv[]) {
 	lcd_fillRGB(0x00, 0xFF, 0xFF);
 	lcd_fillRGB(0xFF, 0xFF, 0xFF);
 	lcd_fillRGB(0x00, 0x00, 0x00);
-
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
 	delayms(500);
-
 	// Demo
 	color=0;
 	lcd_rotation=0;
@@ -416,7 +392,6 @@ int main(int argc,char *argv[]) {
 
 	// 24bit Bitmap only
 	lcd_img("kedei_lcd_v50_pi.bmp", 50, 5);
-
 	lcd_close();
 }
 
