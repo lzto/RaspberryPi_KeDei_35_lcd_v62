@@ -4,8 +4,8 @@ KeDei 6.2 SPI TFT Display Test Program
 
 - Stay away from KeDei Displays!!! they don't give it a sh.t about source code!!!
 - Just in case you got the same display!!!!!!
-- Probably someone can write a fbtft driver for it based on this work.
    hopefully.
+- FBTFT Kernel Driver is here : [[https://github.com/lzto/FBTFT_KeDei_35_lcd_v62]]
 
 -![RPI KeDei 6.2 Display](/kedei_62_work.jpg)
 -![KeDei 6.2 Display Butt](/kedei_butt.jpg)
